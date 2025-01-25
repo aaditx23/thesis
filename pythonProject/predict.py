@@ -25,7 +25,7 @@ object_counter = {}
 
 object_counter1 = {}
 
-line = [(100, 500), (1050, 500)]
+# line = [(100, 500), (1050, 500)]
 speed_line_queue = {}
 
 
@@ -175,22 +175,23 @@ def get_direction(point1, point2):
 
     return direction_str
 
-
 def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
+    # Get frame height
+    frame_height = img.shape[0]
+
+    # Calculate the y-coordinate for the line (1/4th from the bottom)
+    line_y = frame_height - (frame_height // 2)
+
+    # Define the line points (x1, y1) and (x2, y2)
+    line = [(0, line_y), (img.shape[1], line_y)]  # Span the entire width of the frame
+
+    # Draw the green horizontal line
     cv2.line(img, line[0], line[1], (46, 162, 112), 3)
 
-    # Ensure identities is a Python list
-    identities = identities.tolist() if isinstance(identities, np.ndarray) else identities
-
-    print(f"Identities: {identities}")
-    print(f"Data Deque Keys: {list(data_deque.keys())}")
-
     height, width, _ = img.shape
-
-    # Remove tracked points for lost objects
+    # remove tracked point from buffer if object is lost
     for key in list(data_deque):
         if key not in identities:
-            print(f"Removing ID {key} from data_deque")
             data_deque.pop(key)
 
     for i, box in enumerate(bbox):
@@ -200,59 +201,141 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
         y1 += offset[1]
         y2 += offset[1]
 
-        center = (int((x2 + x1) / 2), int((y2 + y1) / 2))
+        # code to find center of bottom edge
+        center = (int((x2 + x1) / 2), int((y2 + y2) / 2))
 
-        # Get the ID of the object
+        # get ID of object
         id = int(identities[i]) if identities is not None else 0
 
-        # Ensure the ID exists in data_deque
+        # create new buffer for new object
         if id not in data_deque:
-            print(f"Initializing data_deque for new ID: {id}")
             data_deque[id] = deque(maxlen=64)
-            speed_line_queue[id] = []
-
         color = compute_color_for_labels(object_id[i])
         obj_name = names[object_id[i]]
         label = '{}{:d}'.format("", id) + ":" + '%s' % (obj_name)
 
-        # Add center to buffer
+        # add center to buffer
         data_deque[id].appendleft(center)
-
         if len(data_deque[id]) >= 2:
             direction = get_direction(data_deque[id][0], data_deque[id][1])
-            object_speed = estimatespeed(data_deque[id][1], data_deque[id][0])
-            speed_line_queue[id].append(object_speed)
             if intersect(data_deque[id][0], data_deque[id][1], line[0], line[1]):
                 cv2.line(img, line[0], line[1], (255, 255, 255), 3)
                 if "South" in direction:
-                    object_counter[obj_name] = object_counter.get(obj_name, 0) + 1
+                    if obj_name not in object_counter:
+                        object_counter[obj_name] = 1
+                    else:
+                        object_counter[obj_name] += 1
                 if "North" in direction:
-                    object_counter1[obj_name] = object_counter1.get(obj_name, 0) + 1
-
-        try:
-            label += " " + str(sum(speed_line_queue[id]) // len(speed_line_queue[id])) + "km/h"
-        except ZeroDivisionError:
-            pass
-
+                    if obj_name not in object_counter1:
+                        object_counter1[obj_name] = 1
+                    else:
+                        object_counter1[obj_name] += 1
         UI_box(box, img, label=label, color=color, line_thickness=2)
-
-        # Draw trail
+        # draw trail
         for i in range(1, len(data_deque[id])):
+            # check if on buffer value is none
             if data_deque[id][i - 1] is None or data_deque[id][i] is None:
                 continue
+            # generate dynamic thickness of trails
             thickness = int(np.sqrt(64 / float(i + i)) * 1.5)
+            # draw trails
             cv2.line(img, data_deque[id][i - 1], data_deque[id][i], color, thickness)
 
-    write_to_file(bbox, identities, obj_name, offset)
+        # 4. Display Count in top right corner
+        for idx, (key, value) in enumerate(object_counter1.items()):
+            cnt_str = str(key) + ":" + str(value)
+            cv2.line(img, (width - 500, 25), (width, 25), [85, 45, 255], 40)
+            cv2.putText(img, f'Number of Vehicles Entering', (width - 500, 35), 0, 1, [225, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+            cv2.line(img, (width - 150, 65 + (idx * 40)), (width, 65 + (idx * 40)), [85, 45, 255], 30)
+            cv2.putText(img, cnt_str, (width - 150, 75 + (idx * 40)), 0, 1, [255, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+
+        for idx, (key, value) in enumerate(object_counter.items()):
+            cnt_str1 = str(key) + ":" + str(value)
+            cv2.line(img, (20, 25), (500, 25), [85, 45, 255], 40)
+            cv2.putText(img, f'Numbers of Vehicles Leaving', (11, 35), 0, 1, [225, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+            cv2.line(img, (20, 65 + (idx * 40)), (127, 65 + (idx * 40)), [85, 45, 255], 30)
+            cv2.putText(img, cnt_str1, (11, 75 + (idx * 40)), 0, 1, [225, 255, 255], thickness=2, lineType=cv2.LINE_AA)
+
     return img
+# def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
+#
+#
+#     # Ensure identities is a Python list
+#     identities = identities.tolist() if isinstance(identities, np.ndarray) else identities
+#
+#     print(f"Identities: {identities}")
+#     print(f"Data Deque Keys: {list(data_deque.keys())}")
+#
+#     height, width, _ = img.shape
+#
+#     # Remove tracked points for lost objects
+#     for key in list(data_deque):
+#         if key not in identities:
+#             print(f"Removing ID {key} from data_deque")
+#             data_deque.pop(key)
+#
+#     for i, box in enumerate(bbox):
+#         x1, y1, x2, y2 = [int(i) for i in box]
+#         x1 += offset[0]
+#         x2 += offset[0]
+#         y1 += offset[1]
+#         y2 += offset[1]
+#
+#         center = (int((x2 + x1) / 2), int((y2 + y1) / 2))
+#
+#         # Get the ID of the object
+#         id = int(identities[i]) if identities is not None else 0
+#
+#         # Ensure the ID exists in data_deque
+#         if id not in data_deque:
+#             print(f"Initializing data_deque for new ID: {id}")
+#             data_deque[id] = deque(maxlen=64)
+#             speed_line_queue[id] = []
+#
+#         color = compute_color_for_labels(object_id[i])
+#         obj_name = names[object_id[i]]
+#         label = '{}{:d}'.format("", id) + ":" + '%s' % (obj_name)
+#
+#         # Add center to buffer
+#         data_deque[id].appendleft(center)
+#
+#         if len(data_deque[id]) >= 2:
+#             direction = get_direction(data_deque[id][0], data_deque[id][1])
+#             object_speed = estimatespeed(data_deque[id][1], data_deque[id][0])
+#             speed_line_queue[id].append(object_speed)
+#             if intersect(data_deque[id][0], data_deque[id][1], line[0], line[1]):
+#                 cv2.line(img, line[0], line[1], (255, 255, 255), 3)
+#                 if "South" in direction:
+#                     object_counter[obj_name] = object_counter.get(obj_name, 0) + 1
+#                 if "North" in direction:
+#                     object_counter1[obj_name] = object_counter1.get(obj_name, 0) + 1
+#
+#         try:
+#             label += " " + str(sum(speed_line_queue[id]) // len(speed_line_queue[id])) + "km/h"
+#         except ZeroDivisionError:
+#             pass
+#
+#         UI_box(box, img, label=label, color=color, line_thickness=2)
+#
+#         # Draw trail
+#         for i in range(1, len(data_deque[id])):
+#             if data_deque[id][i - 1] is None or data_deque[id][i] is None:
+#                 continue
+#             thickness = int(np.sqrt(64 / float(i + i)) * 1.5)
+#             cv2.line(img, data_deque[id][i - 1], data_deque[id][i], color, thickness)
+#
+#     write_to_file(bbox, identities, obj_name, offset)
+#     return img
 
 
 def write_to_file(bbox, identities, obj_name, offset):
-    with open('data_file.txt', 'a') as file:
+    with open('data_file.txt', 'w') as file:
         for i, box in enumerate(bbox):
             x1, y1, x2, y2 = [int(i) for i in box]
             x1 += offset[0]
-
             x2 += offset[0]
             y1 += offset[1]
             y2 += offset[1]
@@ -269,8 +352,20 @@ def write_to_file(bbox, identities, obj_name, offset):
                 object_speed = estimatespeed(data_deque[id][1], data_deque[id][0])
                 speed = sum(speed_line_queue[id]) // len(speed_line_queue[id]) if speed_line_queue[id] else object_speed
 
+            # Determine direction ("in" or "out")
+            direction = None
+            if len(data_deque[id]) >= 2:
+                movement_direction = get_direction(data_deque[id][1], data_deque[id][0])
+                if "North" in movement_direction:
+                    direction = "out"
+                elif "South" in movement_direction:
+                    direction = "in"
+
             # Format the data to be written in the file
-            data_to_write = f"ID: {id}, Type: {obj_name}, Speed: {speed if speed else 'N/A'} km/h, Position: {center}\n"
+            data_to_write = (
+                f"ID: {id}, Type: {obj_name}, Speed: {speed if speed else 'N/A'} km/h, "
+                f"Position: {center}, Direction: {direction if direction else 'N/A'}\n"
+            )
 
             # Write the formatted data to the file
             file.write(data_to_write)

@@ -5,20 +5,23 @@ from PyQt5.QtCore import QUrl
 import sys
 import hydra
 import os
+
 from predict import *
 from pathlib import Path
+from DetectionPredictor import DetectionPredictor
 
 source = 0
 output = ""
 fileName = ""
+
+# Use Hydra to manage the configuration
 @hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
 def predict_webcam(cfg):
     global output
     if source != 0:
-        init_tracker()
+        print(cfg)
         cfg.model = cfg.model or "yolov8n.pt"
         cfg.imgsz = check_imgsz(cfg.imgsz, min_dim=2)  # check image size
-        # cfg.source = cfg.source if cfg.source is not None else current_dir / "assets"
         cfg.source = source
         predictor = DetectionPredictor(cfg)
         predictor()

@@ -7,16 +7,25 @@ import numpy as np
 from numpy import random
 from deep_sort_pytorch.deep_sort import DeepSort
 from deep_sort_pytorch.utils.parser import get_config
+from dataclasses import dataclass
+
+
+@dataclass
+class Vehicle:
+    id: int
+    velocity: str
+    direction: str
+    name: str
+
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 data_deque = {}
-
 object_counter = {}
-
 object_counter1 = {}
-
-# line = [(100, 500), (1050, 500)]
 speed_line_queue = {}
+
+vehicle_in = {}
+vehicle_out = {}
 
 
 def estimatespeed(Location1, Location2):
@@ -82,7 +91,7 @@ def compute_color_for_labels(label):
         color = (85, 45, 255)
     elif label == 2:  # Car
         color = (222, 82, 175)
-    elif label == 3:  # Motobike
+    elif label == 3:  # Motorbike
         color = (0, 204, 255)
     elif label == 5:  # Bus
         color = (0, 149, 255)
@@ -166,17 +175,85 @@ def get_direction(point1, point2):
 
     return direction_str
 
+
+def add_vehicle_in(vehicle: Vehicle):
+    if vehicle.name not in vehicle_in:
+        vehicle_in[vehicle.name] = [vehicle]
+    else:
+        vehicle_in[vehicle.name].append(vehicle)
+
+
+def add_vehicle_out(vehicle: Vehicle):
+    if vehicle.name not in vehicle_out:
+        vehicle_out[vehicle.name] = [vehicle]
+    else:
+        vehicle_out[vehicle.name].append(vehicle)
+
+
+def add_vehicle(id, velocity, direction, obj_name):
+    vehicle = Vehicle(
+        id=id,
+        velocity=f"{velocity} km/h",
+        name=obj_name,
+        direction=""
+    )
+    # Determine direction ("in" or "out")
+    if "South" in direction:
+        vehicle.direction = "in"
+        add_vehicle_in(vehicle)
+    elif "North" in direction:
+        vehicle.direction = "out"
+        add_vehicle_out(vehicle)
+
+    write_to_file(vehicle)
+
+
+def draw_trail(id, img, color):
+    for i in range(1, len(data_deque[id])):
+        # Check if on buffer value is none
+        if data_deque[id][i - 1] is None or data_deque[id][i] is None:
+            continue
+        # Generate dynamic thickness of trails
+        thickness = int(np.sqrt(64 / float(i + i)) * 1.5)
+        # Draw trails
+        cv2.line(img, data_deque[id][i - 1], data_deque[id][i], color, thickness)
+
+
+def show_in(img, width):
+    """
+    Displays the number of vehicles leaving ("out") based on object_data dictionary.
+    """
+    for idx, (label, vehicles) in enumerate(vehicle_in.items()):
+        if vehicles is not None:
+            count = len(list(vehicles))
+            cnt_str = f"{label}: {count}"
+            cv2.line(img, (width - 500, 25), (width, 25), [85, 45, 255], 40)
+            cv2.putText(img, 'Number of Vehicles Entering', (width - 500, 35), 0, 1, [225, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+            cv2.line(img, (width - 150, 65 + (idx * 40)), (width, 65 + (idx * 40)), [85, 45, 255], 30)
+            cv2.putText(img, cnt_str, (width - 150, 75 + (idx * 40)), 0, 1, [255, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+
+
+def show_out(img):
+    """
+    Displays the number of vehicles entering ("in") based on object_data dictionary.
+    """
+    for idx, (label, vehicles) in enumerate(vehicle_out.items()):
+        if vehicles is not None:
+            count = len(list(vehicles))
+            cnt_str1 = f"{label}: {count}"
+            cv2.line(img, (20, 25), (500, 25), [85, 45, 255], 40)
+            cv2.putText(img, 'Number of Vehicles Leaving', (11, 35), 0, 1, [225, 255, 255], thickness=2,
+                        lineType=cv2.LINE_AA)
+            cv2.line(img, (20, 65 + (idx * 40)), (127, 65 + (idx * 40)), [85, 45, 255], 30)
+            cv2.putText(img, cnt_str1, (11, 75 + (idx * 40)), 0, 1, [225, 255, 255], thickness=2, lineType=cv2.LINE_AA)
+
+
 def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
-    # Get frame height
     frame_height = img.shape[0]
-
-    # Calculate the y-coordinate for the line (1/4th from the bottom)
     line_y = frame_height - (frame_height // 3)
-
-    # Define the line points (x1, y1) and (x2, y2)
     line = [(0, line_y), (img.shape[1], line_y)]  # Span the entire width of the frame
-
-    # Draw the green horizontal line
     cv2.line(img, line[0], line[1], (46, 162, 112), 3)
 
     height, width, _ = img.shape
@@ -215,62 +292,18 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
                 # Calculate velocity
                 velocity = estimatespeed(data_deque[id][1], data_deque[id][0])
 
-                # Determine direction ("in" or "out")
-                if "South" in direction:
-                    direction_str = "in"
-                    if obj_name not in object_counter:
-                        object_counter[obj_name] = 1
-                    else:
-                        object_counter[obj_name] += 1
-                elif "North" in direction:
-                    direction_str = "out"
-                    if obj_name not in object_counter1:
-                        object_counter1[obj_name] = 1
-                    else:
-                        object_counter1[obj_name] += 1
-
-                # Write to file (including object label)
-                write_to_file(id, velocity, direction_str, obj_name)
+                add_vehicle(id, velocity, direction, obj_name)
 
         UI_box(box, img, label=label, color=color, line_thickness=2)
-        # Draw trail
-        for i in range(1, len(data_deque[id])):
-            # Check if on buffer value is none
-            if data_deque[id][i - 1] is None or data_deque[id][i] is None:
-                continue
-            # Generate dynamic thickness of trails
-            thickness = int(np.sqrt(64 / float(i + i)) * 1.5)
-            # Draw trails
-            cv2.line(img, data_deque[id][i - 1], data_deque[id][i], color, thickness)
+        draw_trail(id, img, color)
 
-    # Display counts for vehicles leaving (top-left corner)
-    for idx, (key, value) in enumerate(object_counter1.items()):
-        cnt_str1 = str(key) + ":" + str(value)
-        cv2.line(img, (20, 25), (500, 25), [85, 45, 255], 40)
-        cv2.putText(img, f'Numbers of Vehicles Leaving', (11, 35), 0, 1, [225, 255, 255], thickness=2, lineType=cv2.LINE_AA)
-        cv2.line(img, (20, 65 + (idx * 40)), (127, 65 + (idx * 40)), [85, 45, 255], 30)
-        cv2.putText(img, cnt_str1, (11, 75 + (idx * 40)), 0, 1, [225, 255, 255], thickness=2, lineType=cv2.LINE_AA)
-
-    # Display counts for vehicles entering (top-right corner)
-    for idx, (key, value) in enumerate(object_counter.items()):
-        cnt_str = str(key) + ":" + str(value)
-        cv2.line(img, (width - 500, 25), (width, 25), [85, 45, 255], 40)
-        cv2.putText(img, f'Number of Vehicles Entering', (width - 500, 35), 0, 1, [225, 255, 255], thickness=2, lineType=cv2.LINE_AA)
-        cv2.line(img, (width - 150, 65 + (idx * 40)), (width, 65 + (idx * 40)), [85, 45, 255], 30)
-        cv2.putText(img, cnt_str, (width - 150, 75 + (idx * 40)), 0, 1, [255, 255, 255], thickness=2, lineType=cv2.LINE_AA)
+    show_in(img, width)
+    show_out(img)
 
     return img
 
-def write_to_file(object_id, velocity, direction, object_label):
-    """
-    Writes object ID, velocity, direction, and object label to a file called data.txt.
 
-    Args:
-        object_id (int): The ID of the object.
-        velocity (float): The velocity of the object in km/h.
-        direction (str): The direction of the object ("in" or "out").
-        object_label (str): The label/class of the object (e.g., "Car", "Bus").
-    """
+def write_to_file(vehicle: Vehicle):
     with open('data.txt', 'a') as file:  # Open file in append mode
-        file.write(f"Object ID: {object_id}, Velocity: {velocity} km/h, Direction: {direction}, Label: {object_label}\n")
-
+        file.write(
+            f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Label: {vehicle.name}\n")

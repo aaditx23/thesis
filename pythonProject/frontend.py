@@ -6,8 +6,11 @@ import sys
 import hydra
 import os
 
-from predict import *
 from pathlib import Path
+
+from ultralytics.yolo.utils import DEFAULT_CONFIG
+from ultralytics.yolo.utils.checks import check_imgsz
+
 from DetectionPredictor import DetectionPredictor
 
 source = 0
@@ -15,9 +18,13 @@ output = ""
 fileName = ""
 
 # Use Hydra to manage the configuration
+def clear_data():
+    file = open("data.txt", 'w')
+    file.close()
 @hydra.main(version_base=None, config_path=str(DEFAULT_CONFIG.parent), config_name=DEFAULT_CONFIG.name)
 def predict_webcam(cfg):
     global output
+    clear_data()
     if source != 0:
         print(cfg)
         cfg.model = cfg.model or "yolov8n.pt"

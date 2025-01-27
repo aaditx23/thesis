@@ -16,6 +16,7 @@ class Vehicle:
     velocity: str
     direction: str
     name: str
+    lane: int = 0
 
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
@@ -190,12 +191,13 @@ def add_vehicle_out(vehicle: Vehicle):
         vehicle_out[vehicle.name].append(vehicle)
 
 
-def add_vehicle(id, velocity, direction, obj_name):
+def add_vehicle(id, velocity, direction, obj_name, lane):
     vehicle = Vehicle(
         id=id,
         velocity=f"{velocity} km/h",
         name=obj_name,
-        direction=""
+        direction="",
+        lane=lane
     )
     # Determine direction ("in" or "out")
     if "South" in direction:
@@ -253,8 +255,18 @@ def show_out(img):
 def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
     frame_height = img.shape[0]
     line_y = frame_height - (frame_height // 3)
-    line = [(0, line_y), (img.shape[1], line_y)]  # Span the entire width of the frame
-    cv2.line(img, line[0], line[1], (46, 162, 112), 3)
+    lane_lines = [
+        [(50, line_y - 50), (150, line_y - 50)],  # Lane 1
+        [(200, line_y - 50), (300, line_y - 50)],  # Lane 2
+        [(350, line_y - 50), (450, line_y - 50)],  # Lane 3
+        [(500, line_y - 50), (600, line_y - 50)]  # Lane 4
+    ]
+    crossing = [(0, line_y), (img.shape[1], line_y)]
+    cv2.line(img, crossing[0], crossing[1], (46, 162, 112), 3)
+
+
+    for idx, segment in enumerate(lane_lines):  # Draw lane segments
+        cv2.line(img, segment[0], segment[1], (255, 0, 0), 2)
 
     height, width, _ = img.shape
     # Remove tracked point from buffer if object is lost
@@ -286,13 +298,20 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
         data_deque[id].appendleft(center)
         if len(data_deque[id]) >= 2:
             direction = get_direction(data_deque[id][0], data_deque[id][1])
-            if intersect(data_deque[id][0], data_deque[id][1], line[0], line[1]):
-                cv2.line(img, line[0], line[1], (255, 255, 255), 3)
+            if intersect(data_deque[id][0], data_deque[id][1], crossing[0], crossing[1]):
+                cv2.line(img, crossing[0], crossing[1], (255, 255, 255), 3)
+
+                # Determine which lane segment was crossed
+                lane_number = 0
+                for idx, segment in enumerate(lane_lines):
+                    if intersect(data_deque[id][0], data_deque[id][1], segment[0], segment[1]):
+                        lane_number = idx + 1  # Lane numbers start at 1
+                        break
 
                 # Calculate velocity
                 velocity = estimatespeed(data_deque[id][1], data_deque[id][0])
 
-                add_vehicle(id, velocity, direction, obj_name)
+                add_vehicle(id, velocity, direction, obj_name, lane_number)
 
         UI_box(box, img, label=label, color=color, line_thickness=2)
         draw_trail(id, img, color)
@@ -306,4 +325,4 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
 def write_to_file(vehicle: Vehicle):
     with open('data.txt', 'a') as file:  # Open file in append mode
         file.write(
-            f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Label: {vehicle.name}\n")
+            f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n")

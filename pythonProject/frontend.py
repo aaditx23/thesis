@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5 import QtWidgets
 from PyQt5.QtMultimedia import QMediaPlayer, QMediaContent
 from PyQt5.QtMultimediaWidgets import QVideoWidget
 from PyQt5.QtCore import QUrl
@@ -12,6 +12,9 @@ from ultralytics.yolo.utils import DEFAULT_CONFIG
 from ultralytics.yolo.utils.checks import check_imgsz
 
 from DetectionPredictor import DetectionPredictor
+
+from pythonProject.LaneAdjustment import LaneAdjustmentApp
+import cv2
 
 source = 0
 output = ""
@@ -89,6 +92,19 @@ class VideoProcessingApp(QtWidgets.QWidget):
         else:
             QtWidgets.QMessageBox.warning(self, "No Video Selected", "Please select a video to play.")
 
+    # def browse_video(self):
+    #     global fileName, source
+    #     video_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video File", "", "MP4 Files (*.mp4)")
+    #     if video_file:
+    #         self.video_path = video_file
+    #         self.video_path_label.setText(f"Video Path: {self.video_path}")
+    #
+    #         fileName = os.path.basename(self.video_path)
+    #         source = self.video_path
+    #         self.video = source
+    #         print(fileName)
+    #         self.play_video()
+
     def browse_video(self):
         global fileName, source
         video_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video File", "", "MP4 Files (*.mp4)")
@@ -99,8 +115,30 @@ class VideoProcessingApp(QtWidgets.QWidget):
             fileName = os.path.basename(self.video_path)
             source = self.video_path
             self.video = source
-            print(fileName)
-            self.play_video()
+
+            # Capture the first frame
+            cap = cv2.VideoCapture(video_file)
+
+            # Check if the video was opened successfully
+            if not cap.isOpened():
+                print("Error: Could not open video.")
+                return
+
+            # Set the video capture to the 10th frame
+            frame_number = 10
+            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+
+            # Read the 10th frame
+            ret, frame = cap.read()
+            cap.release()
+
+            if ret:
+                self.frame = frame
+
+                # Open the lane adjustment window
+                self.lane_adjustment_window = LaneAdjustmentApp(frame=self.frame)
+                self.lane_adjustment_window.show()
+
 
 
 

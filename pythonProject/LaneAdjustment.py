@@ -1,4 +1,5 @@
 from PyQt5 import QtWidgets, QtGui, QtCore
+from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from dataclasses import dataclass
 import cv2
@@ -14,6 +15,7 @@ class Lane:
 
 
 class LaneAdjustmentApp(QtWidgets.QWidget):
+    lanes_passed = pyqtSignal(list)  # Define the signal
     def __init__(self, frame, parent=None):
         super().__init__(parent)
         self.frame = frame
@@ -110,14 +112,11 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
         # Connect the action to button clicks
 
         def on_press():
-            print("PRESSED")
             timer.start()
         def on_release():
             timer.stop()
         def perform():
-            print("ACTION")
             action()
-            print(self.lanes[0].start_x)
 
         button.clicked.connect(perform)
         # Add continuous action support with QTimer
@@ -134,15 +133,10 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
         """Add OK and Cancel buttons at the bottom of the UI."""
         self.ok_button = QtWidgets.QPushButton("OK")
         self.ok_button.setFixedWidth(80)
-        self.ok_button.clicked.connect(self.finalize_lanes)
-
-        self.cancel_button = QtWidgets.QPushButton("Cancel")
-        self.cancel_button.setFixedWidth(80)
-        self.cancel_button.clicked.connect(self.close)
+        self.ok_button.clicked.connect(self.close)
 
         bottom_layout = QtWidgets.QHBoxLayout()
         bottom_layout.addWidget(self.ok_button)
-        bottom_layout.addWidget(self.cancel_button)
 
         self.layout.addLayout(bottom_layout)
 
@@ -203,7 +197,9 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
         qt_image = QImage(rgb_frame.data, rgb_frame.shape[1], rgb_frame.shape[0], rgb_frame.strides[0], QImage.Format_RGB888)
         self.frame_label.setPixmap(QPixmap.fromImage(qt_image))
 
-    def finalize_lanes(self):
-        """Finalize the lanes and close the app."""
-        print("Finalized lanes:", self.lanes)
-        self.close()
+    def closeEvent(self, event):
+        """Override closeEvent to emit the lanes data when the window is closed."""
+        # Emit the lanes data when the window is closed
+        enabled_lanes = [lane for lane in self.lanes if lane.enabled]
+        self.lanes_passed.emit(enabled_lanes)
+        event.accept()

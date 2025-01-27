@@ -40,8 +40,11 @@ def predict_webcam(cfg):
 class VideoProcessingApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+        self.lanes_list = None
+        self.frame = None
+        self.lane_adjustment_window = None
         self.video = "No video Selected"
-
+        self.lane_list = []
         self.setWindowTitle("Vehicle Metrics Processor")
         self.setGeometry(100, 100, 800, 600)
 
@@ -75,6 +78,10 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.player = None
         self.video_path = None
 
+    def update_lanes(self):
+
+        print(self.lane_list)
+
     def play_video(self):
         if self.video_path:
             predict_webcam()
@@ -92,18 +99,6 @@ class VideoProcessingApp(QtWidgets.QWidget):
         else:
             QtWidgets.QMessageBox.warning(self, "No Video Selected", "Please select a video to play.")
 
-    # def browse_video(self):
-    #     global fileName, source
-    #     video_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video File", "", "MP4 Files (*.mp4)")
-    #     if video_file:
-    #         self.video_path = video_file
-    #         self.video_path_label.setText(f"Video Path: {self.video_path}")
-    #
-    #         fileName = os.path.basename(self.video_path)
-    #         source = self.video_path
-    #         self.video = source
-    #         print(fileName)
-    #         self.play_video()
 
     def browse_video(self):
         global fileName, source
@@ -124,20 +119,24 @@ class VideoProcessingApp(QtWidgets.QWidget):
                 print("Error: Could not open video.")
                 return
 
-            # Set the video capture to the 10th frame
-            frame_number = 10
-            cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
-
-            # Read the 10th frame
+            # Read the first frame
             ret, frame = cap.read()
             cap.release()
 
             if ret:
                 self.frame = frame
 
-                # Open the lane adjustment window
+                # Open the lane adjustment window and pass the first frame
                 self.lane_adjustment_window = LaneAdjustmentApp(frame=self.frame)
+                self.lane_adjustment_window.lanes_passed.connect(self.update_enabled_lanes)
                 self.lane_adjustment_window.show()
+            else:
+                print("Error: Could not read the first frame.")
+
+    def update_enabled_lanes(self, lanes):
+        """Update the enabled lanes when the lane adjustment window is closed."""
+        print("Updated lanes:", lanes)
+        self.lanes_list = lanes  # Store the updated lanes
 
 
 

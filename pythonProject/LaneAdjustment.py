@@ -3,15 +3,27 @@ from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from dataclasses import dataclass
 import cv2
+import random
 
 
 @dataclass
 class Lane:
     start_x: int
     width: int
+    color: tuple
     enabled: bool = False
     y: int = 0
     thickness: int = 5
+
+    @staticmethod
+    def generate_color():
+        """Generate a random bright color."""
+        # Random bright colors are typically in the higher range of RGB values
+        r = random.randint(128, 255)
+        g = random.randint(128, 255)
+        b = random.randint(128, 255)
+        return (r, g, b)
+
 
 
 class LaneAdjustmentApp(QtWidgets.QWidget):
@@ -27,7 +39,8 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
                 start_x=100 + (i * 60),
                 width=50,
                 enabled=(i == 0),
-                y=self.frame_height - (self.frame_height // 3)
+                y=self.frame_height - (self.frame_height // 3),
+                color=Lane.generate_color()
             )
             for i in range(8)
         ]
@@ -181,7 +194,7 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
             if lane.enabled:
                 start_x = lane.start_x
                 end_x = start_x + lane.width
-                cv2.line(frame_copy, (start_x, lane.y), (end_x, lane.y), (0, 255, 0), lane.thickness)
+                cv2.line(frame_copy, (start_x, lane.y), (end_x, lane.y), lane.color, lane.thickness)
 
         self.display_frame(frame_copy)
 

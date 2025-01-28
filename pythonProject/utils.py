@@ -27,6 +27,7 @@ speed_line_queue = {}
 
 vehicle_in = {}
 vehicle_out = {}
+lanes = []
 
 
 def estimatespeed(Location1, Location2):
@@ -147,12 +148,32 @@ def UI_box(x, img, color=None, label=None, line_thickness=None):
         cv2.putText(img, label, (c1[0], c1[1] - 2), 0, tl / 3, [225, 255, 255], thickness=tf, lineType=cv2.LINE_AA)
 
 
+# def intersect(A, B, C, D):
+#     return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+#
+#
+# def ccw(A, B, C):
+#     return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
 def intersect(A, B, C, D):
-    return ccw(A, C, D) != ccw(B, C, D) and ccw(A, B, C) != ccw(A, B, D)
+    """
+    Check if a bounding box (A, B) intersects with a horizontal lane (C, D).
 
+    :param A, B: Bounding box coordinates (x1, y1) and (x2, y2) for the vehicle.
+    :param C, D: Lane coordinates (x1, y1) and (x2, y2) for the lane (must be horizontal).
+    :return: True if the bounding box intersects with the lane, False otherwise.
+    """
+    # Ensure the lane is horizontal by checking if the y-coordinates are the same
+    if C[1] != D[1]:
+        raise ValueError("Lane must be a horizontal line.")
 
-def ccw(A, B, C):
-    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+    # Check if the bounding box overlaps with the lane vertically (Y-range overlap)
+    if min(A[1], B[1]) <= C[1] <= max(A[1], B[1]):
+        # Check if the bounding box horizontally overlaps with the lane
+        if (C[0] <= A[0] <= D[0]) or (C[0] <= B[0] <= D[0]) or (A[0] <= C[0] <= B[0]):
+            return True
+
+    return False
 
 
 def get_direction(point1, point2):
@@ -255,18 +276,14 @@ def show_out(img):
 def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
     frame_height = img.shape[0]
     line_y = frame_height - (frame_height // 3)
-    lane_lines = [
-        [(50, line_y - 50), (150, line_y - 50)],  # Lane 1
-        [(200, line_y - 50), (300, line_y - 50)],  # Lane 2
-        [(350, line_y - 50), (450, line_y - 50)],  # Lane 3
-        [(500, line_y - 50), (600, line_y - 50)]  # Lane 4
-    ]
-    crossing = [(0, line_y), (img.shape[1], line_y)]
-    cv2.line(img, crossing[0], crossing[1], (46, 162, 112), 3)
+    lane_lines = lanes[:len(lanes) - 1]
+    crossing = lanes[-1]
+
+    # crossing.draw(img)
+    for lane in lane_lines:
+        lane.draw(img)
 
 
-    for idx, segment in enumerate(lane_lines):  # Draw lane segments
-        cv2.line(img, segment[0], segment[1], (255, 0, 0), 2)
 
     height, width, _ = img.shape
     # Remove tracked point from buffer if object is lost
@@ -298,20 +315,22 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
         data_deque[id].appendleft(center)
         if len(data_deque[id]) >= 2:
             direction = get_direction(data_deque[id][0], data_deque[id][1])
-            if intersect(data_deque[id][0], data_deque[id][1], crossing[0], crossing[1]):
-                cv2.line(img, crossing[0], crossing[1], (255, 255, 255), 3)
 
+            if intersect(data_deque[id][0], data_deque[id][1], crossing.start(), crossing.end()):
                 # Determine which lane segment was crossed
                 lane_number = 0
-                for idx, segment in enumerate(lane_lines):
-                    if intersect(data_deque[id][0], data_deque[id][1], segment[0], segment[1]):
+                for idx, lane in enumerate(lane_lines):
+                    if id == 13 or id == 18 or id == 20:
+                        print(id, "DATA DEQUE ", data_deque[id][0], data_deque[id][1], lane.start(), lane.end(), intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end() ))
+                    if intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end() ):
+                        lane.blink(img)
                         lane_number = idx + 1  # Lane numbers start at 1
                         break
 
                 # Calculate velocity
                 velocity = estimatespeed(data_deque[id][1], data_deque[id][0])
-
-                add_vehicle(id, velocity, direction, obj_name, lane_number)
+                if lane_number != 0:
+                    add_vehicle(id, velocity, direction, obj_name, lane_number)
 
         UI_box(box, img, label=label, color=color, line_thickness=2)
         draw_trail(id, img, color)

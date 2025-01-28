@@ -8,6 +8,7 @@ import os
 
 from pathlib import Path
 
+from PyQt5.QtWidgets import QPlainTextEdit
 from ultralytics.yolo.utils import DEFAULT_CONFIG
 from ultralytics.yolo.utils.checks import check_imgsz
 
@@ -15,6 +16,7 @@ from DetectionPredictor import DetectionPredictor
 
 from pythonProject.LaneAdjustment import LaneAdjustmentApp
 import cv2
+import utils
 
 source = 0
 output = ""
@@ -46,7 +48,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.video = "No video Selected"
         self.lane_list = []
         self.setWindowTitle("Vehicle Metrics Processor")
-        self.setGeometry(100, 100, 800, 600)
+        self.showMaximized()
 
         # Layouts
         self.layout = QtWidgets.QVBoxLayout()
@@ -56,6 +58,12 @@ class VideoProcessingApp(QtWidgets.QWidget):
         # Controls
         self.upload_button = QtWidgets.QPushButton("Browse for Video")
         self.upload_button.clicked.connect(self.browse_video)
+        # adjust lane button
+        self.lane_button = QtWidgets.QPushButton("Adjust Lanes")
+        self.lane_button.clicked.connect(self.adjust_lane)
+        # start processin button
+        self.start_processing = QtWidgets.QPushButton("Start")
+        self.start_processing.clicked.connect(self.start_prediction)
 
         # Display the selected video path
         self.video_path_label = QtWidgets.QLabel(self.video)
@@ -78,9 +86,6 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.player = None
         self.video_path = None
 
-    def update_lanes(self):
-
-        print(self.lane_list)
 
     def play_video(self):
         if self.video_path:
@@ -110,35 +115,51 @@ class VideoProcessingApp(QtWidgets.QWidget):
             fileName = os.path.basename(self.video_path)
             source = self.video_path
             self.video = source
-
-            # Capture the first frame
-            cap = cv2.VideoCapture(video_file)
-
-            # Check if the video was opened successfully
-            if not cap.isOpened():
-                print("Error: Could not open video.")
-                return
-
-            # Read the first frame
-            ret, frame = cap.read()
-            cap.release()
-
-            if ret:
-                self.frame = frame
-
-                # Open the lane adjustment window and pass the first frame
-                self.lane_adjustment_window = LaneAdjustmentApp(frame=self.frame)
-                self.lane_adjustment_window.lanes_passed.connect(self.update_enabled_lanes)
-                self.lane_adjustment_window.show()
-            else:
-                print("Error: Could not read the first frame.")
-
-    def update_enabled_lanes(self, lanes):
-        """Update the enabled lanes when the lane adjustment window is closed."""
-        print("Updated lanes:", lanes)
-        self.lanes_list = lanes  # Store the updated lanes
+            self.controls_layout.addWidget(self.lane_button)
 
 
+
+    def adjust_lane(self):
+        # Capture the first frame
+        cap = cv2.VideoCapture(self.video_path)
+
+        # Check if the video was opened successfully
+        if not cap.isOpened():
+            print("Error: Could not open video.")
+            return
+
+        # Read the first frame
+        ret, frame = cap.read()
+        cap.release()
+
+        if ret:
+            self.frame = frame
+
+            # Open the lane adjustment window and pass the first frame
+            self.lane_adjustment_window = LaneAdjustmentApp(frame=self.frame)
+            self.lane_adjustment_window.lanes_passed.connect(self.update_enabled_lanes)
+            # self.lane_adjustment_window.window_closed.connect(self.play_video)
+            self.lane_adjustment_window.show()
+        else:
+            print("Error: Could not read the first frame.")
+
+    def update_enabled_lanes(self, lanes_list):
+        utils.lanes = lanes_list
+        self.controls_layout.addWidget(self.start_processing)
+    def start_prediction(self):
+        if hasattr(self, "start_processing"):
+            self.controls_layout.removeWidget(self.start_processing)
+            self.start_processing.deleteLater()
+            del self.start_processing
+
+            # Start the video processing
+        self.play_video()
+
+    def closeEvent(self, event):
+        """Restore stdout and stderr when the app is closed."""
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        super().closeEvent(event)
 
 
 if __name__ == "__main__":

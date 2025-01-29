@@ -21,10 +21,10 @@ class Vehicle:
 
 palette = (2 ** 11 - 1, 2 ** 15 - 1, 2 ** 20 - 1)
 data_deque = {}
-object_counter = {}
-object_counter1 = {}
-speed_line_queue = {}
-
+data = {
+    "in": [],
+    "out": []
+}
 vehicle_in = {}
 vehicle_out = {}
 lanes = []
@@ -41,49 +41,6 @@ def estimatespeed(Location1, Location2):
     speed = d_meters * time_constant
 
     return int(speed)
-
-
-# def init_tracker():
-#     cfg_deep = get_config()
-#     cfg_deep.merge_from_file("deep_sort_pytorch/configs/deep_sort.yaml")
-#
-#     deepsort = DeepSort(cfg_deep.DEEPSORT.REID_CKPT,
-#                         max_dist=cfg_deep.DEEPSORT.MAX_DIST, min_confidence=cfg_deep.DEEPSORT.MIN_CONFIDENCE,
-#                         nms_max_overlap=cfg_deep.DEEPSORT.NMS_MAX_OVERLAP,
-#                         max_iou_distance=cfg_deep.DEEPSORT.MAX_IOU_DISTANCE,
-#                         max_age=cfg_deep.DEEPSORT.MAX_AGE, n_init=cfg_deep.DEEPSORT.N_INIT,
-#                         nn_budget=cfg_deep.DEEPSORT.NN_BUDGET,
-#                         use_cuda=True)
-#
-#     return deepsort
-
-
-##########################################################################################
-def xyxy_to_xywh(*xyxy):
-    """" Calculates the relative bounding box from absolute pixel values. """
-    bbox_left = min([xyxy[0].item(), xyxy[2].item()])
-    bbox_top = min([xyxy[1].item(), xyxy[3].item()])
-    bbox_w = abs(xyxy[0].item() - xyxy[2].item())
-    bbox_h = abs(xyxy[1].item() - xyxy[3].item())
-    x_c = (bbox_left + bbox_w / 2)
-    y_c = (bbox_top + bbox_h / 2)
-    w = bbox_w
-    h = bbox_h
-    return x_c, y_c, w, h
-
-
-def xyxy_to_tlwh(bbox_xyxy):
-    tlwh_bboxs = []
-    for i, box in enumerate(bbox_xyxy):
-        x1, y1, x2, y2 = [int(i) for i in box]
-        top = x1
-        left = y1
-        w = int(x2 - x1)
-        h = int(y2 - y1)
-        tlwh_obj = [top, left, w, h]
-        tlwh_bboxs.append(tlwh_obj)
-    return tlwh_bboxs
-
 
 def compute_color_for_labels(label):
     """
@@ -181,17 +138,21 @@ def get_direction(point1, point2):
 
     # calculate y axis direction
     if point1[1] > point2[1]:
-        direction_str += "South"
+        # direction_str += "South"
+        direction_str += "in"
     elif point1[1] < point2[1]:
-        direction_str += "North"
+        # direction_str += "North"
+        direction_str += "out"
     else:
         direction_str += ""
 
     # calculate x axis direction
     if point1[0] > point2[0]:
-        direction_str += "East"
+        # direction_str += "East" #right
+        direction_str += "right"
     elif point1[0] < point2[0]:
-        direction_str += "West"
+        # direction_str += "West"
+        direction_str += "left"
     else:
         direction_str += ""
 
@@ -217,19 +178,16 @@ def add_vehicle(id, velocity, direction, obj_name, lane):
         id=id,
         velocity=f"{velocity} km/h",
         name=obj_name,
-        direction="",
+        direction=direction,
         lane=lane
     )
-    # Determine direction ("in" or "out")
-    if "South" in direction:
-        vehicle.direction = "in"
+    if direction == "in":
         add_vehicle_in(vehicle)
-    elif "North" in direction:
-        vehicle.direction = "out"
+    else:
         add_vehicle_out(vehicle)
 
-    write_to_file(vehicle)
-
+    if not any(v.id == vehicle.id for v in data[vehicle.direction]):
+        data[vehicle.direction].append(vehicle)
 
 def draw_trail(id, img, color):
     for i in range(1, len(data_deque[id])):
@@ -282,8 +240,6 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
     for lane in lane_lines:
         lane.draw(img)
 
-
-
     height, width, _ = img.shape
     # Remove tracked point from buffer if object is lost
     for key in list(data_deque):
@@ -314,22 +270,26 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
         data_deque[id].appendleft(center)
         if len(data_deque[id]) >= 2:
             direction = get_direction(data_deque[id][0], data_deque[id][1])
-
+            lane_dir = ""
             if intersect(data_deque[id][0], data_deque[id][1], crossing.start(), crossing.end()):
                 # Determine which lane segment was crossed
                 lane_number = 0
                 for idx, lane in enumerate(lane_lines):
-                    if id == 13 or id == 18 or id == 20:
-                        print(id, "DATA DEQUE ", data_deque[id][0], data_deque[id][1], lane.start(), lane.end(), intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end() ))
-                    if intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end() ):
-                        lane.blink(img)
-                        lane_number = idx + 1  # Lane numbers start at 1
-                        break
+                    # if id == 13 or id == 18 or id == 20:
+                    #     print(id, "DATA DEQUE ", data_deque[id][0], data_deque[id][1], lane.start(), lane.end(), intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end() ))
+                    if intersect(data_deque[id][0], data_deque[id][1], lane.start(), lane.end()):
+
+                        if lane.direction in direction:
+                            print(lane.direction, direction, "Match", lane.direction in direction )
+                            lane_dir = lane.direction
+                            lane.blink(img)
+                            lane_number = idx + 1  # Lane numbers start at 1
+                            break
 
                 # Calculate velocity
                 velocity = estimatespeed(data_deque[id][1], data_deque[id][0])
                 if lane_number != 0:
-                    add_vehicle(id, velocity, direction, obj_name, lane_number)
+                    add_vehicle(id, velocity, lane_dir, obj_name, lane_number)
 
         UI_box(box, img, label=label, color=color, line_thickness=2)
         draw_trail(id, img, color)
@@ -340,7 +300,25 @@ def draw_boxes(img, bbox, names, object_id, identities=None, offset=(0, 0)):
     return img
 
 
-def write_to_file(vehicle: Vehicle):
-    with open('data.txt', 'a') as file:  # Open file in append mode
-        file.write(
-            f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n")
+# def write_to_file(vehicle: Vehicle):
+#     if vehicle.direction == "in":
+#
+#         with open('in.txt', 'a') as file:  # Open file in append mode
+#             file.write(
+#                 f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n")
+#     else:
+#         with open('out.txt', 'a') as file:  # Open file in append mode
+#             file.write(
+#                 f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n")
+
+def write_to_file():
+    for vehicle in data["in"]:
+        with open('data.txt', 'a') as file:
+            file.write(
+                    f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n"
+            )
+    for vehicle in data["out"]:
+        with open('data.txt', 'a') as file:
+            file.write(
+                    f"Object ID: {vehicle.id}, Velocity: {vehicle.velocity}, Direction: {vehicle.direction}, Lane: {vehicle.lane}, Label: {vehicle.name}\n"
+            )

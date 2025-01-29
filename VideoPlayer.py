@@ -22,7 +22,7 @@ class VideoPlayer(QWidget):
 
         # Create the play, pause, replay buttons
         self.play_button = QPushButton("Play")
-        self.pause_button = QPushButton("Pause")
+        self.pause_button = QPushButton("Stop")
         self.replay_button = QPushButton("Replay")
 
         self.play_button.clicked.connect(self.play_video)

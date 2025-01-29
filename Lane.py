@@ -8,11 +8,14 @@ import cv2
 class Lane:
     start_x: int
     width: int
+    direction: str
+
     color: tuple
     enabled: bool = False
     y: int = 0
     thickness: int = 5
     name: str = "lane"
+
 
     def draw(self, frame):
         end = self.start_x + self.width

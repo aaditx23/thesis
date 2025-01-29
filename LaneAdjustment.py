@@ -26,8 +26,9 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
                 start_x=100 + (i * 60),
                 width=50,
                 enabled=(i == 0),
-                y=(self.frame_height - (self.frame_height // 3))+1,
-                color=Lane.color(i)
+                y=(self.frame_height - (self.frame_height // 3)) + 1,
+                color=Lane.color(i),
+                direction="in" if i < 4 else "out"  # First 4 lanes = "in", rest = "out"
             )
             for i in range(8)
         ]
@@ -39,7 +40,8 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
             y=self.frame_height - (self.frame_height // 3),
             color=(65, 70, 84),
             name="crossing",
-            thickness=10
+            thickness=10,
+            direction="center"
         )
 
         # UI components for lane controls
@@ -59,7 +61,7 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
         # Frame Display
         self.frame_label = QtWidgets.QLabel()
         self.frame_label.setStyleSheet("background-color: black;")
-        self.frame_label.setFixedSize(800, 600)
+        self.frame_label.setFixedSize(800, 500)
         self.layout.addWidget(self.frame_label)
 
         # Lane Controls Layout
@@ -81,38 +83,50 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
 
     def create_lane_controls(self):
         """Create controls for all lanes and add them to the UI."""
-        for index, lane in enumerate(self.lanes):
+
+        # Add "IN only" label above the first 4 lanes
+        in_label = QtWidgets.QLabel("IN only")
+        in_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.controls_layout.addWidget(in_label)
+
+        for index, lane in enumerate(self.lanes[:4]):  # First 4 lanes (IN)
             lane_layout = QtWidgets.QHBoxLayout()
-
-            # Checkbox to enable/disable the lane
-            checkbox = QtWidgets.QCheckBox(f"Lane {index + 1}")
-            checkbox.setChecked(lane.enabled)
-            checkbox.stateChanged.connect(
-                lambda state, l=lane, idx=index: self.toggle_lane(state, l, idx)
-            )
-            lane_layout.addWidget(checkbox)
-
-            left_button = self.create_lane_button("←", lane, lambda idx=index: self.adjust_lane(idx, -15, "start_x"))
-            right_button = self.create_lane_button("→", lane, lambda idx=index: self.adjust_lane(idx, 15, "start_x"))
-            # up_button = self.create_lane_button("↑", lane, lambda idx=index: self.adjust_lane(idx, -5, "y"))
-            # down_button = self.create_lane_button("↓", lane, lambda idx=index: self.adjust_lane(idx, 5, "y"))
-            size_plus_button = self.create_lane_button("+", lane, lambda idx=index: self.adjust_lane(idx, 15, "width"))
-            size_minus_button = self.create_lane_button("-", lane, lambda idx=index: self.adjust_lane(idx, -15, "width"))
-
-            # Add buttons to the layout
-            for button in [left_button, right_button, size_plus_button, size_minus_button]:
-                lane_layout.addWidget(button)
-
-            # Save references for later updates
-            self.lane_controls.append(
-                {
-                    "checkbox": checkbox,
-                    "buttons": [left_button, right_button, size_plus_button, size_minus_button],
-                }
-            )
-
-            # Add the lane layout to the controls layout
+            self.add_lane_control(index, lane, lane_layout)
             self.controls_layout.addLayout(lane_layout)
+
+        # Add "OUT only" label above the last 4 lanes
+        out_label = QtWidgets.QLabel("OUT only")
+        out_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 10px;")
+        self.controls_layout.addWidget(out_label)
+
+        for index, lane in enumerate(self.lanes[4:], start=4):  # Last 4 lanes (OUT)
+            lane_layout = QtWidgets.QHBoxLayout()
+            self.add_lane_control(index, lane, lane_layout)
+            self.controls_layout.addLayout(lane_layout)
+
+    def add_lane_control(self, index, lane, lane_layout):
+        """Helper function to add controls for a single lane."""
+
+        # Checkbox to enable/disable the lane
+        checkbox = QtWidgets.QCheckBox(f"Lane {index + 1}")
+        checkbox.setChecked(lane.enabled)
+        checkbox.stateChanged.connect(lambda state, l=lane, idx=index: self.toggle_lane(state, l, idx))
+        lane_layout.addWidget(checkbox)
+
+        left_button = self.create_lane_button("←", lane, lambda idx=index: self.adjust_lane(idx, -15, "start_x"))
+        right_button = self.create_lane_button("→", lane, lambda idx=index: self.adjust_lane(idx, 15, "start_x"))
+        size_plus_button = self.create_lane_button("+", lane, lambda idx=index: self.adjust_lane(idx, 15, "width"))
+        size_minus_button = self.create_lane_button("-", lane, lambda idx=index: self.adjust_lane(idx, -15, "width"))
+
+        # Add buttons to the layout
+        for button in [left_button, right_button, size_plus_button, size_minus_button]:
+            lane_layout.addWidget(button)
+
+        # Save references for later updates
+        self.lane_controls.append({
+            "checkbox": checkbox,
+            "buttons": [left_button, right_button, size_plus_button, size_minus_button],
+        })
 
     def create_crossing_control(self):
         """Create controls for all lanes and add them to the UI."""
@@ -182,7 +196,22 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
 
     def toggle_lane(self, state, lane, lane_index):
         """Enable or disable a lane."""
-        self.lanes[lane_index].enabled = state == QtCore.Qt.Checked
+        if state == QtCore.Qt.Checked:
+            # Find the last enabled lane before this one
+            prev_enabled_lane = None
+            for i in range(lane_index - 1, -1, -1):
+                if self.lanes[i].enabled:
+                    prev_enabled_lane = self.lanes[i]
+                    break
+
+            # Set start_x based on the previous enabled lane
+            if prev_enabled_lane:
+                lane.start_x = prev_enabled_lane.start_x + prev_enabled_lane.width
+
+            lane.enabled = True
+        else:
+            lane.enabled = False
+
         self.update_controls()
         self.render_frame_with_lanes()
 

@@ -17,8 +17,9 @@ fileName = ""
 
 # Use Hydra to manage the configuration
 def clear_data():
-    file = open("data.txt", 'w')
-    file.close()
+    f = open("data.txt", 'w')
+    f.close()
+
 class VideoProcessingApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()

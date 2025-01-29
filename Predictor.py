@@ -3,7 +3,7 @@ import os
 from collections import defaultdict
 from PyQt5.QtCore import pyqtSignal, QObject, QThread
 from ultralytics import YOLO
-from utils import draw_boxes
+from utils import draw_boxes, write_to_file
 
 
 class Predictor(QThread):
@@ -19,6 +19,7 @@ class Predictor(QThread):
         """
         super().__init__()
         self.model = YOLO(model_path)
+        print(self.model.names)
         self.class_list = self.model.names
         self.class_counts = defaultdict(int)
         self.crossed_ids = set()
@@ -91,9 +92,11 @@ class Predictor(QThread):
 
             self.process_frame(frame)  # Process and store the frame
 
+
         cap.release()
         self.save_video()
         print("Video processing completed. Frames stored in memory.")
+
 
     def save_video(self, output_path="runs/detect/output.mp4"):
         """
@@ -115,4 +118,5 @@ class Predictor(QThread):
 
         out.release()
         print(f"Annotated video saved at: {output_path}")
+        write_to_file()
         self.completed.emit()

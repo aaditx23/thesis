@@ -33,9 +33,15 @@ class Lane:
         return self.start_x + self.width, self.y
 
     @staticmethod
-    def generate_color():
-        # Random bright colors are typically in the higher range of RGB values
-        r = random.randint(128, 255)
-        g = random.randint(200, 255)
-        b = random.randint(128, 255)
-        return r, g, b
+    def color(idx):
+        lst = [
+            (255, 0, 0),  # Red
+            (0, 255, 0),  # Green
+            (0, 0, 255),  # Blue
+            (0, 255, 255),  # Cyan
+            (255, 0, 255),  # Magenta
+            (255, 255, 0),  # Yellow
+            (138, 43, 226),  # Violet
+            (247, 141, 187)  # Cream
+        ]
+        return lst[idx]

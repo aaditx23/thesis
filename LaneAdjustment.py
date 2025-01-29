@@ -27,7 +27,7 @@ class LaneAdjustmentApp(QtWidgets.QWidget):
                 width=50,
                 enabled=(i == 0),
                 y=(self.frame_height - (self.frame_height // 3))+1,
-                color=Lane.generate_color()
+                color=Lane.color(i)
             )
             for i in range(8)
         ]

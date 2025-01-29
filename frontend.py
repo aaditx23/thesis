@@ -8,7 +8,7 @@ from pathlib import Path
 from LaneAdjustment import LaneAdjustmentApp
 import cv2
 import utils
-import predict
+from Predictor import Predictor
 
 source = 0
 output = "runs/detect"
@@ -18,14 +18,14 @@ fileName = ""
 def clear_data():
     file = open("data.txt", 'w')
     file.close()
-def predict_webcam():
-    clear_data()
-    if source != 0:
-        predict.predict(source)
-    print("Predicting")
 class VideoProcessingApp(QtWidgets.QWidget):
     def __init__(self):
         super().__init__()
+
+        self.predictor = Predictor()
+        self.predictor.update_frame.connect(self.update_frame_progress)
+        self.predictor.completed.connect(self.play_video)
+
         self.lanes_list = None
         self.frame = None
         self.lane_adjustment_window = None
@@ -38,6 +38,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.layout = QtWidgets.QVBoxLayout()
         self.controls_layout = QtWidgets.QHBoxLayout()
         self.video_layout = QtWidgets.QVBoxLayout()
+        self.v_layout = QtWidgets.QVBoxLayout()
 
         # Controls
         self.upload_button = QtWidgets.QPushButton("Browse for Video")
@@ -53,8 +54,9 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.video_path_label = QtWidgets.QLabel(self.video)
 
         #progress
-        self.frame_progress_label = QtWidgets.QLabel("")
-        self.frame_progress_label.setVisible(False)
+        self.frame_progress_label = QtWidgets.QLabel("Progress: ")
+        self.frame_progress_label.setVisible(True)
+
 
         self.controls_layout.addWidget(self.upload_button)
         self.controls_layout.addWidget(self.video_path_label)
@@ -65,8 +67,12 @@ class VideoProcessingApp(QtWidgets.QWidget):
 
         self.video_layout.addWidget(self.video_widget)
 
-        # Combine Layouts
-        self.layout.addLayout(self.controls_layout)
+        # vertical Layouts
+        self.v_layout.addLayout(self.controls_layout)
+        self.v_layout.addWidget(self.frame_progress_label)
+
+        # combine layours
+        self.layout.addLayout(self.v_layout)
         self.layout.addLayout(self.video_layout)
         self.setLayout(self.layout)
 
@@ -77,8 +83,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
 
     def play_video(self):
         if self.video_path:
-            predict_webcam()
-
+            self.start_processing.setDisabled(False)
             relativePath = "runs/detect/output.mp4"
             video = str(Path(relativePath).absolute())
             print("VIDEO IS ", video)
@@ -93,8 +98,8 @@ class VideoProcessingApp(QtWidgets.QWidget):
 
     def update_frame_progress(self):
         """Update the frame progress label dynamically."""
-        if hasattr(predict, "current") and hasattr(predict, "total"):
-            self.frame_progress_label.setText(f"Frame: {predict.current}/{predict.total}")
+        print("Updating")
+        self.frame_progress_label.setText(f"Frame: {self.predictor.current_frame}/{self.predictor.total_frames}")
     def browse_video(self):
         global fileName, source
         video_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video File", "", "MP4 Files (*.mp4)")
@@ -106,6 +111,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
             source = self.video_path
             self.video = source
             self.controls_layout.addWidget(self.lane_button)
+            self.predictor.source = self.video_path
 
 
 
@@ -124,11 +130,9 @@ class VideoProcessingApp(QtWidgets.QWidget):
 
         if ret:
             self.frame = frame
-
             # Open the lane adjustment window and pass the first frame
             self.lane_adjustment_window = LaneAdjustmentApp(frame=self.frame)
             self.lane_adjustment_window.lanes_passed.connect(self.update_enabled_lanes)
-            # self.lane_adjustment_window.window_closed.connect(self.play_video)
             self.lane_adjustment_window.show()
         else:
             print("Error: Could not read the first frame.")
@@ -137,19 +141,12 @@ class VideoProcessingApp(QtWidgets.QWidget):
         utils.lanes = lanes_list
         self.controls_layout.addWidget(self.start_processing)
     def start_prediction(self):
-        if hasattr(self, "start_processing"):
-            self.controls_layout.removeWidget(self.start_processing)
-            self.start_processing.deleteLater()
-            del self.start_processing
-
-            # Start the video processing
-        self.play_video()
-
-    def closeEvent(self, event):
-        """Restore stdout and stderr when the app is closed."""
-        sys.stdout = sys.__stdout__
-        sys.stderr = sys.__stderr__
-        super().closeEvent(event)
+        if self.predictor.isRunning():
+            print("Prediction is already running!")
+            return
+        self.start_processing.setDisabled(True)
+        clear_data()
+        self.predictor.start()
 
 
 if __name__ == "__main__":

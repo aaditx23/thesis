@@ -9,6 +9,7 @@ from LaneAdjustment import LaneAdjustmentApp
 import cv2
 import utils
 from Predictor import Predictor
+from VideoPlayer import VideoPlayer
 
 source = 0
 output = "runs/detect"
@@ -25,6 +26,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.predictor = Predictor()
         self.predictor.update_frame.connect(self.update_frame_progress)
         self.predictor.completed.connect(self.play_video)
+
 
         self.lanes_list = None
         self.frame = None
@@ -62,8 +64,8 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.controls_layout.addWidget(self.video_path_label)
 
         # Video Display
-        self.video_widget = QVideoWidget()
-        self.video_widget.setStyleSheet("background-color: black;")
+        self.video_widget = VideoPlayer()
+        self.video_widget.disable_buttons()
 
         self.video_layout.addWidget(self.video_widget)
 
@@ -88,11 +90,13 @@ class VideoProcessingApp(QtWidgets.QWidget):
             relativePath = "runs/detect/output.mp4"
             video = str(Path(relativePath).absolute())
             print("VIDEO IS ", video)
-            self.player = QMediaPlayer()
-            media_content = QMediaContent(QUrl.fromLocalFile(video))
-            self.player.setMedia(media_content)
-            self.player.setVideoOutput(self.video_widget)
-            self.player.play()
+            # self.player = QMediaPlayer()
+            # media_content = QMediaContent(QUrl.fromLocalFile(video))
+            # self.player.setMedia(media_content)
+            # self.player.setVideoOutput(self.video_widget)
+            # self.player.play()
+            self.video_widget.enable_buttons()
+            self.video_widget.play_video(video)
 
         else:
             QtWidgets.QMessageBox.warning(self, "No Video Selected", "Please select a video to play.")
@@ -103,6 +107,7 @@ class VideoProcessingApp(QtWidgets.QWidget):
         self.frame_progress_label.setText(f"Frame: {self.predictor.current_frame}/{self.predictor.total_frames}")
     def browse_video(self):
         global fileName, source
+        self.video_widget.disable_buttons()
         video_file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Open Video File", "", "MP4 Files (*.mp4)")
         if video_file:
             self.video_path = video_file

@@ -83,7 +83,8 @@ class VideoProcessingApp(QtWidgets.QWidget):
 
     def play_video(self):
         if self.video_path:
-            self.start_processing.setDisabled(False)
+            self.lane_button.setDisabled(False)
+            # self.start_processing.setDisabled(False)
             relativePath = "runs/detect/output.mp4"
             video = str(Path(relativePath).absolute())
             print("VIDEO IS ", video)
@@ -144,7 +145,9 @@ class VideoProcessingApp(QtWidgets.QWidget):
         if self.predictor.isRunning():
             print("Prediction is already running!")
             return
-        self.start_processing.setDisabled(True)
+        self.controls_layout.removeWidget(self.start_processing)
+        self.start_processing.setVisible(False)
+        self.lane_button.setDisabled(True)
         clear_data()
         self.predictor.start()
 

@@ -1,0 +1,14 @@
+Object ID: 6, Velocity: 48 km/h, Direction: out, Lane: 1, Label: car
+Object ID: 2, Velocity: 30 km/h, Direction: out, Lane: 2, Label: car
+Object ID: 1, Velocity: 24 km/h, Direction: out, Lane: 3, Label: car
+Object ID: 10, Velocity: 111 km/h, Direction: in, Lane: 4, Label: car
+Object ID: 16, Velocity: 43 km/h, Direction: out, Lane: 2, Label: car
+Object ID: 15, Velocity: 33 km/h, Direction: out, Lane: 1, Label: car
+Object ID: 9, Velocity: 43 km/h, Direction: in, Lane: 5, Label: car
+Object ID: 19, Velocity: 19 km/h, Direction: out, Lane: 3, Label: car
+Object ID: 25, Velocity: 47 km/h, Direction: out, Lane: 2, Label: car
+Object ID: 37, Velocity: 48 km/h, Direction: out, Lane: 1, Label: car
+Object ID: 39, Velocity: 33 km/h, Direction: out, Lane: 3, Label: car
+Object ID: 45, Velocity: 135 km/h, Direction: in, Lane: 6, Label: car
+Object ID: 47, Velocity: 39 km/h, Direction: out, Lane: 2, Label: car
+Object ID: 50, Velocity: 124 km/h, Direction: in, Lane: 6, Label: car
